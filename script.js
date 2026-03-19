@@ -132,7 +132,7 @@ const sceneIcon = L.icon({
 const lockedSceneState = {};
 
 const lockedSceneIcon = L.icon({
-  iconUrl: 'icons/vista-marker.png',
+  iconUrl: 'icons/vista-marker-red.png',
   iconSize: [36, 44],
   iconAnchor: [18, 44],
   popupAnchor: [0, -36]
@@ -347,7 +347,7 @@ addScene({
   coords: [2850, 5600],
   description: 'A narrow crossing settlement with old timber walkways and suspicious tollkeepers.',
   url: 'https://example.com/bridge-town',
-  passwordLocked: false,
+  passwordLocked: true,
   variants: {
     Default: 'https://example.com/bridge-town',
     Rain: 'https://example.com/bridge-town-rain',
@@ -397,6 +397,14 @@ const archivistCodes = {
       level: 2
     }
   },
+
+  'WITCHHUTRED': {
+  message: "Hidden Witch's Hut unlocked.",
+  action: {
+    type: 'sceneUnlock',
+    sceneId: 'bridge_town'
+  }
+}
 };
 
 const loadedSave = loadMapState();
