@@ -124,7 +124,7 @@ function ensureFogPattern() {
   let svg = pane.querySelector('svg');
 
   if (!svg) {
-    // Force Leaflet to create the SVG in the fog pane
+    // Force Leaflet to create an SVG in the fog pane
     L.polygon([[0, 0], [0, 1], [1, 1]], {
       renderer: fogRenderer,
       pane: 'fog',
@@ -148,6 +148,7 @@ function ensureFogPattern() {
   pattern.setAttribute('height', '512');
 
   const image = document.createElementNS('http://www.w3.org/2000/svg', 'image');
+  image.setAttributeNS('http://www.w3.org/1999/xlink', 'href', FOG_TEXTURE_URL);
   image.setAttribute('href', FOG_TEXTURE_URL);
   image.setAttribute('width', '512');
   image.setAttribute('height', '512');
@@ -158,6 +159,8 @@ function ensureFogPattern() {
   pattern.appendChild(image);
   defs.appendChild(pattern);
   svg.insertBefore(defs, svg.firstChild);
+
+  console.log('Fog pattern injected:', FOG_TEXTURE_URL);
 }
 
 ensureFogPattern();
@@ -199,6 +202,13 @@ const fogStyle = {
   interactive: true
 };
 
+function applyFogPattern(layer) {
+  if (!layer || !layer._path) return;
+
+  layer._path.setAttribute('fill', 'url(#fogPatternImage)');
+  layer._path.setAttribute('stroke', 'none');
+}
+
 function applyFogPatternClass(layer) {
   if (layer && layer._path) {
     layer._path.classList.add('fog-pattern-fill');
@@ -208,12 +218,15 @@ function applyFogPatternClass(layer) {
 function makeRegion(name, coords) {
   const polygon = L.polygon(coords, fogStyle).addTo(map);
 
-  polygon.once('add', function () {
-    applyFogPatternClass(polygon);
-  });
+  function tryApplyPattern() {
+    if (polygon._path) {
+      applyFogPattern(polygon);
+    } else {
+      requestAnimationFrame(tryApplyPattern);
+    }
+  }
 
-  // In case the path already exists by the time this runs
-  setTimeout(() => applyFogPatternClass(polygon), 0);
+  tryApplyPattern();
 
   regions[name] = polygon;
   regionState[name] = 3;
