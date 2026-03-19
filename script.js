@@ -121,75 +121,7 @@ const bounds = [[0, 0], [mapHeight, mapWidth]];
 map.fitBounds(bounds);
 
 // ---------- GENERATED FOG PATTERN ----------
-const FOG_PATTERN_SIZE = 512;
-
-function makeFogTileDataUrl() {
-  const svg = `
-  <svg xmlns="http://www.w3.org/2000/svg" width="${FOG_PATTERN_SIZE}" height="${FOG_PATTERN_SIZE}" viewBox="0 0 ${FOG_PATTERN_SIZE} ${FOG_PATTERN_SIZE}">
-    <defs>
-      <filter id="fogNoise">
-        <feTurbulence
-          type="fractalNoise"
-          baseFrequency="0.012 0.018"
-          numOctaves="4"
-          seed="8"
-          stitchTiles="stitch"
-        />
-        <feColorMatrix
-          type="matrix"
-          values="
-            1 0 0 0 0
-            0 1 0 0 0
-            0 0 1 0 0
-            0 0 0 2.4 -0.65
-          "
-        />
-        <feGaussianBlur stdDeviation="8" />
-      </filter>
-
-      <filter id="softBlur">
-        <feGaussianBlur stdDeviation="24" />
-      </filter>
-    </defs>
-
-    <!-- dark transparent base -->
-    <rect width="100%" height="100%" fill="#1a1d24" fill-opacity="0.78"/>
-
-    <!-- large soft cloud masses -->
-    <g filter="url(#softBlur)" fill="#ffffff" fill-opacity="0.14">
-      <ellipse cx="110" cy="120" rx="95" ry="72"/>
-      <ellipse cx="245" cy="160" rx="120" ry="88"/>
-      <ellipse cx="395" cy="110" rx="100" ry="74"/>
-
-      <ellipse cx="150" cy="320" rx="120" ry="86"/>
-      <ellipse cx="325" cy="300" rx="140" ry="96"/>
-      <ellipse cx="445" cy="360" rx="90" ry="68"/>
-
-      <ellipse cx="70" cy="445" rx="78" ry="58"/>
-      <ellipse cx="255" cy="440" rx="126" ry="86"/>
-      <ellipse cx="430" cy="455" rx="105" ry="72"/>
-    </g>
-
-    <!-- stitched turbulent fog detail -->
-    <g filter="url(#fogNoise)" opacity="0.40">
-      <rect width="100%" height="100%" fill="#ffffff"/>
-    </g>
-
-    <!-- faint extra wisps -->
-    <g filter="url(#softBlur)" fill="#ffffff" fill-opacity="0.07">
-      <ellipse cx="60" cy="60" rx="55" ry="40"/>
-      <ellipse cx="470" cy="70" rx="48" ry="34"/>
-      <ellipse cx="480" cy="250" rx="52" ry="38"/>
-      <ellipse cx="70" cy="250" rx="62" ry="42"/>
-      <ellipse cx="120" cy="500" rx="60" ry="40"/>
-      <ellipse cx="380" cy="505" rx="70" ry="48"/>
-    </g>
-  </svg>`;
-
-  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
-}
-
-const FOG_TEXTURE_URL = makeFogTileDataUrl();
+const FOG_PATTERN_SIZE = 320;
 
 function ensureFogPattern() {
   const pane = map.getPane('fog');
@@ -215,25 +147,82 @@ function ensureFogPattern() {
 
   const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
 
+  const filter = document.createElementNS('http://www.w3.org/2000/svg', 'filter');
+  filter.setAttribute('id', 'fogBlur');
+  const blur = document.createElementNS('http://www.w3.org/2000/svg', 'feGaussianBlur');
+  blur.setAttribute('stdDeviation', '18');
+  filter.appendChild(blur);
+  defs.appendChild(filter);
+
   const pattern = document.createElementNS('http://www.w3.org/2000/svg', 'pattern');
   pattern.setAttribute('id', 'fogPatternImage');
   pattern.setAttribute('patternUnits', 'userSpaceOnUse');
   pattern.setAttribute('width', String(FOG_PATTERN_SIZE));
   pattern.setAttribute('height', String(FOG_PATTERN_SIZE));
 
-  const image = document.createElementNS('http://www.w3.org/2000/svg', 'image');
-  image.setAttribute('href', FOG_TEXTURE_URL);
-  image.setAttribute('width', String(FOG_PATTERN_SIZE));
-  image.setAttribute('height', String(FOG_PATTERN_SIZE));
-  image.setAttribute('x', '0');
-  image.setAttribute('y', '0');
-  image.setAttribute('preserveAspectRatio', 'none');
+  // dark base
+  const bg = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+  bg.setAttribute('x', '0');
+  bg.setAttribute('y', '0');
+  bg.setAttribute('width', String(FOG_PATTERN_SIZE));
+  bg.setAttribute('height', String(FOG_PATTERN_SIZE));
+  bg.setAttribute('fill', '#1a1d24');
+  bg.setAttribute('fill-opacity', '0.88');
+  pattern.appendChild(bg);
 
-  pattern.appendChild(image);
+  // cloud masses
+  const clouds = [
+    [70, 70, 85, 55, 0.16],
+    [170, 95, 100, 65, 0.14],
+    [265, 70, 80, 50, 0.15],
+
+    [95, 180, 100, 65, 0.13],
+    [210, 190, 120, 75, 0.16],
+    [285, 235, 70, 45, 0.12],
+
+    [60, 280, 75, 45, 0.13],
+    [170, 270, 105, 65, 0.14],
+    [270, 285, 88, 55, 0.13]
+  ];
+
+  clouds.forEach(([cx, cy, rx, ry, opacity]) => {
+    const e = document.createElementNS('http://www.w3.org/2000/svg', 'ellipse');
+    e.setAttribute('cx', String(cx));
+    e.setAttribute('cy', String(cy));
+    e.setAttribute('rx', String(rx));
+    e.setAttribute('ry', String(ry));
+    e.setAttribute('fill', '#ffffff');
+    e.setAttribute('fill-opacity', String(opacity));
+    e.setAttribute('filter', 'url(#fogBlur)');
+    pattern.appendChild(e);
+  });
+
+  // lighter wisps
+  const wisps = [
+    [35, 35, 40, 20, 0.08],
+    [300, 40, 35, 18, 0.08],
+    [40, 145, 50, 24, 0.06],
+    [310, 160, 40, 20, 0.07],
+    [55, 315, 45, 20, 0.07],
+    [250, 315, 55, 24, 0.06]
+  ];
+
+  wisps.forEach(([cx, cy, rx, ry, opacity]) => {
+    const e = document.createElementNS('http://www.w3.org/2000/svg', 'ellipse');
+    e.setAttribute('cx', String(cx));
+    e.setAttribute('cy', String(cy));
+    e.setAttribute('rx', String(rx));
+    e.setAttribute('ry', String(ry));
+    e.setAttribute('fill', '#ffffff');
+    e.setAttribute('fill-opacity', String(opacity));
+    e.setAttribute('filter', 'url(#fogBlur)');
+    pattern.appendChild(e);
+  });
+
   defs.appendChild(pattern);
   svg.insertBefore(defs, svg.firstChild);
 
-  console.log('Generated fog pattern injected.');
+  console.log('Inline fog pattern injected.');
 }
 
 ensureFogPattern();
@@ -270,10 +259,8 @@ const fogStyle = {
   renderer: fogRenderer,
   pane: 'fog',
   stroke: false,
-  fillColor: '#111',
   fillOpacity: fogLevels[3],
-  interactive: false,
-  className: 'fog-pattern-fill'
+  interactive: false
 };
 
 function applyFogPattern(layer) {
@@ -281,9 +268,6 @@ function applyFogPattern(layer) {
 
   layer._path.setAttribute('fill', 'url(#fogPatternImage)');
   layer._path.setAttribute('stroke', 'none');
-
-  layer._path.style.fill = 'url(#fogPatternImage)';
-  layer._path.style.stroke = 'none';
 }
 
 function makeRegion(name, coords) {
