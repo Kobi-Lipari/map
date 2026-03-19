@@ -124,8 +124,7 @@ function ensureFogPattern() {
   let svg = pane.querySelector('svg');
 
   if (!svg) {
-    // Force Leaflet to create an SVG in the fog pane
-    L.polygon([[0, 0], [0, 1], [1, 1]], {
+    const temp = L.polygon([[0, 0], [0, 1], [1, 1]], {
       renderer: fogRenderer,
       pane: 'fog',
       interactive: false,
@@ -134,6 +133,7 @@ function ensureFogPattern() {
     }).addTo(map);
 
     svg = pane.querySelector('svg');
+    map.removeLayer(temp);
   }
 
   if (!svg) return;
@@ -144,14 +144,14 @@ function ensureFogPattern() {
   const pattern = document.createElementNS('http://www.w3.org/2000/svg', 'pattern');
   pattern.setAttribute('id', 'fogPatternImage');
   pattern.setAttribute('patternUnits', 'userSpaceOnUse');
-  pattern.setAttribute('width', '512');
-  pattern.setAttribute('height', '512');
+  pattern.setAttribute('width', '256');
+  pattern.setAttribute('height', '256');
 
   const image = document.createElementNS('http://www.w3.org/2000/svg', 'image');
   image.setAttributeNS('http://www.w3.org/1999/xlink', 'href', FOG_TEXTURE_URL);
   image.setAttribute('href', FOG_TEXTURE_URL);
-  image.setAttribute('width', '512');
-  image.setAttribute('height', '512');
+  image.setAttribute('width', '256');
+  image.setAttribute('height', '256');
   image.setAttribute('x', '0');
   image.setAttribute('y', '0');
   image.setAttribute('preserveAspectRatio', 'none');
@@ -197,9 +197,9 @@ const fogStyle = {
   renderer: fogRenderer,
   pane: 'fog',
   stroke: false,
-  fillColor: '#ffffff',
   fillOpacity: fogLevels[3],
-  interactive: true
+  interactive: true,
+  className: 'fog-pattern-fill'
 };
 
 function applyFogPattern(layer) {
@@ -217,16 +217,6 @@ function applyFogPatternClass(layer) {
 
 function makeRegion(name, coords) {
   const polygon = L.polygon(coords, fogStyle).addTo(map);
-
-  function tryApplyPattern() {
-    if (polygon._path) {
-      applyFogPattern(polygon);
-    } else {
-      requestAnimationFrame(tryApplyPattern);
-    }
-  }
-
-  tryApplyPattern();
 
   regions[name] = polygon;
   regionState[name] = 3;
