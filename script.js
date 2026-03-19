@@ -192,26 +192,91 @@ function addScene(scene) {
 }
 
 function buildScenePopup(scene) {
+  const isLocked = !!lockedSceneState[scene.id];
+  const hintText = scene.lockHint
+    ? `<p style="margin:0 0 10px 0; color:#d66;"><em>${scene.lockHint}</em></p>`
+    : '';
+
+  const linkHtml = isLocked
+    ? `<span style="
+        display:inline-block;
+        padding:8px 10px;
+        background:#3a1f1f;
+        color:#f1c0c0;
+        border:1px solid rgba(255,120,120,0.35);
+        border-radius:6px;
+        cursor:not-allowed;
+        opacity:0.85;
+      ">Locked</span>`
+    : `<a href="${scene.url}" target="_blank" style="
+        display:inline-block;
+        padding:8px 10px;
+        background:#2a241a;
+        color:#f3ead5;
+        border:1px solid rgba(232,220,192,0.2);
+        border-radius:6px;
+        text-decoration:none;
+      ">Open scene</a>`;
+
   return `
-    <div style="min-width:220px;">
+    <div style="min-width:240px;">
       <h3 style="margin:0 0 8px 0;">${scene.name}</h3>
       <p style="margin:0 0 10px 0;">${scene.description}</p>
-      <a href="${scene.url}" target="_blank">Open scene</a>
+      ${isLocked ? hintText : ''}
+      ${linkHtml}
     </div>
   `;
 }
 
 function buildVariantPopup(scene) {
+  const isLocked = !!lockedSceneState[scene.id];
+
+  if (isLocked) {
+    return `
+      <div style="min-width:240px;">
+        <h3 style="margin:0 0 8px 0;">${scene.name}</h3>
+        <p style="margin:0 0 10px 0;">This scene is still locked.</p>
+        ${
+          scene.lockHint
+            ? `<p style="margin:0 0 10px 0; color:#d66;"><em>${scene.lockHint}</em></p>`
+            : ''
+        }
+        <span style="
+          display:inline-block;
+          padding:8px 10px;
+          background:#3a1f1f;
+          color:#f1c0c0;
+          border:1px solid rgba(255,120,120,0.35);
+          border-radius:6px;
+          cursor:not-allowed;
+          opacity:0.85;
+        ">Variants locked</span>
+      </div>
+    `;
+  }
+
   const variants = scene.variants || { Default: scene.url };
 
   const links = Object.entries(variants)
     .map(([label, url]) => {
-      return `<div style="margin:6px 0;"><a href="${url}" target="_blank">${label}</a></div>`;
+      return `
+        <div style="margin:8px 0;">
+          <a href="${url}" target="_blank" style="
+            display:block;
+            padding:8px 10px;
+            background:#2a241a;
+            color:#f3ead5;
+            text-decoration:none;
+            border-radius:6px;
+            border:1px solid rgba(232,220,192,0.2);
+          ">${label}</a>
+        </div>
+      `;
     })
     .join('');
 
   return `
-    <div style="min-width:220px;">
+    <div style="min-width:240px;">
       <h3 style="margin:0 0 8px 0;">${scene.name} Variants</h3>
       <p style="margin:0 0 10px 0;">Choose a scene version:</p>
       ${links}
@@ -223,11 +288,13 @@ function setSceneVisibility(sceneId, visible) {
   const marker = sceneMarkers[sceneId];
   if (!marker) return;
 
-  marker.setOpacity(visible ? 1 : 0);
-
   if (!visible) {
+    marker.setOpacity(0);
     marker.closePopup();
+    return;
   }
+
+  marker.setOpacity(1);
 }
 
 function updateRegionScenes(regionName) {
@@ -258,6 +325,7 @@ function unlockScene(sceneId) {
   if (lockedSceneState[sceneId] === false) return false;
 
   lockedSceneState[sceneId] = false;
+  sceneMarkers[sceneId].setIcon(sceneIcon);
   
   for (const regionName in regionScenes) {
     if (regionScenes[regionName].includes(sceneId)) {
@@ -346,6 +414,7 @@ addScene({
   name: 'Bridge Town',
   coords: [2850, 5600],
   description: 'A narrow crossing settlement with old timber walkways and suspicious tollkeepers.',
+  lockHint: 'The old woman in Bridge Town mentioned that the path opens for those who know the hut’s true name.',
   url: 'https://example.com/bridge-town',
   passwordLocked: true,
   variants: {
