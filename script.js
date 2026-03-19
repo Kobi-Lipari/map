@@ -6,6 +6,7 @@ const cols = 7;
 const pieceWidth = mapWidth / cols;
 const pieceHeight = mapHeight / rows;
 const overlap = 1;
+const SAVE_KEY = '_save_v1';
 
 const imageUrls = [
   /*G1*/ 'tiles/image_part_043.png',
@@ -249,12 +250,76 @@ function setRegionState(regionName, level) {
   });
 
   updateRegionScenes(regionName);
+  saveMapState();
+}
+
+function unlockScene(sceneId) {
+  if (!(sceneId in lockedSceneState)) return false;
+  if (lockedSceneState[sceneId] === false) return false;
+
+  lockedSceneState[sceneId] = false;
+  
+  for (const regionName in regionScenes) {
+    if (regionScenes[regionName].includes(sceneId)) {
+      if (regionState[regionName] === 1) {
+        setSceneVisibility(sceneId, true);
+      }
+      break;
+    }
+  }
+
+  saveMapState();
+  return true;
 }
 
 function cycleRegionState(regionName) {
   const current = regionState[regionName];
   const next = current === 3 ? 2 : current === 2 ? 1 : 3;
   setRegionState(regionName, next);
+}
+
+function saveMapState() {
+  const saveData = {
+    regionState,
+    lockedSceneState,
+    usedCodes: Array.from(usedCodes)
+  };
+  localStorage.setItem(SAVE_KEY, JSON.stringify(saveData));
+}
+
+function loadMapState() {
+  const raw = localStorage.getItem(SAVE_KEY);
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw);
+  } catch (err) {
+    console.error('Failed to parse save data:', err);
+    return null;
+  }
+}
+
+function applyLoadedState(saveData) {
+  if (!saveData) return;
+
+  if (saveData.lockedSceneState) {
+    for (const sceneId in saveData.lockedSceneState) {
+      if (sceneId in lockedSceneState) {
+        lockedSceneState[sceneId] = saveData.lockedSceneState[sceneId];
+      }
+    }
+  }
+
+  if (Array.isArray(saveData.usedCodes)) {
+    saveData.usedCodes.forEach(code => usedCodes.add(code));
+  }
+
+  if (saveData.regionState) {
+    for (const regionName in saveData.regionState) {
+      if (regionName in regions) {
+        setRegionState(regionName, saveData.regionState[regionName]);
+      }
+    }
+  }
 }
 
 makeRegion('eastern_forest', [
@@ -334,22 +399,33 @@ const archivistCodes = {
   },
 };
 
+const loadedSave = loadMapState();
+applyLoadedState(loadedSave);
+
 const usedCodes = new Set();
 
 function runArchivistAction(action) {
-  if (!action) return;
-
+  if (!action) return false;
   if (action.type === 'regionLevel') {
     const current = regionState[action.region];
-
     if (current > action.level) {
       setRegionState(action.region, action.level);
       return true;
     }
-
     return false;
   }
-
+  if (action.type === 'sceneUnlock') {
+    return unlockScene(action.sceneId);
+  }
+  if (action.type === 'multi') {
+    let changed = false;
+    action.actions.forEach(subAction => {
+      if (runArchivistAction(subAction)) {
+        changed = true;
+      }
+    });
+    return changed;
+  }
   return false;
 }
 
@@ -409,6 +485,7 @@ function submitArchivistCode() {
     setArchivistStatus(entry.message);
     addArchivistLog(`${code} — ${entry.message}`);
     archivistInput.value = '';
+    saveMapState();
   } else {
     setArchivistStatus(`"${code}" provided no new information.`);
   }
