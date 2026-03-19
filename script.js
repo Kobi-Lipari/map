@@ -6,9 +6,11 @@ const cols = 7;
 const pieceWidth = mapWidth / cols;
 const pieceHeight = mapHeight / rows;
 const overlap = 1;
-const usedCodes = new Set();
-const SAVE_KEY = '_save_v1';
 
+const usedCodes = new Set();
+const SAVE_KEY = '_save_v2';
+
+// ---------- MAP TILES ----------
 const imageUrls = [
   /*G1*/ 'tiles/image_part_043.png',
   /*G2*/ 'tiles/image_part_044.png',
@@ -67,9 +69,8 @@ const imageUrls = [
   /*A7*/ 'tiles/image_part_007.png'
 ];
 
-const fogRenderer = L.canvas({ padding: 2 });
-
-var map = L.map('map', {
+// ---------- MAP ----------
+const map = L.map('map', {
   crs: L.CRS.Simple,
   minZoom: -2,
   maxZoom: 3,
@@ -81,11 +82,17 @@ var map = L.map('map', {
   doubleClickZoom: false,
   zoomControl: false,
   attributionControl: false,
-  preferCanvas: true
+  closePopupOnClick: false
 });
 
 map.createPane('tiles');
 map.getPane('tiles').style.zIndex = 200;
+
+map.createPane('fog');
+map.getPane('fog').style.zIndex = 450;
+map.getPane('fog').style.pointerEvents = 'auto';
+
+const fogRenderer = L.svg({ padding: 2 });
 
 for (let row = 0; row < rows; row++) {
   for (let col = 0; col < cols; col++) {
@@ -107,104 +114,67 @@ for (let row = 0; row < rows; row++) {
 const bounds = [[0, 0], [mapHeight, mapWidth]];
 map.fitBounds(bounds);
 
-function ensureFogTexturePattern() {
-  const svgPane = map.getPane('fogTexture');
-  if (!svgPane) return;
+// ---------- FOG PATTERN ----------
+const FOG_TEXTURE_URL = 'textures/fog-tile.png';
 
-  let svg = svgPane.querySelector('svg');
+function ensureFogPattern() {
+  const pane = map.getPane('fog');
+  if (!pane) return;
+
+  let svg = pane.querySelector('svg');
+
   if (!svg) {
-    // Force Leaflet to create an SVG renderer in that pane
-    L.polygon([[0,0],[0,1],[1,1]], {
-      renderer: fogTextureRenderer,
-      pane: 'fogTexture',
+    // Force Leaflet to create the SVG in the fog pane
+    L.polygon([[0, 0], [0, 1], [1, 1]], {
+      renderer: fogRenderer,
+      pane: 'fog',
       interactive: false,
-      opacity: 0,
+      stroke: false,
       fillOpacity: 0
     }).addTo(map);
 
-    svg = svgPane.querySelector('svg');
+    svg = pane.querySelector('svg');
   }
 
   if (!svg) return;
-  if (svg.querySelector('#fogTexturePattern')) return;
+  if (svg.querySelector('#fogPatternImage')) return;
 
   const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+
   const pattern = document.createElementNS('http://www.w3.org/2000/svg', 'pattern');
-  pattern.setAttribute('id', 'fogTexturePattern');
+  pattern.setAttribute('id', 'fogPatternImage');
   pattern.setAttribute('patternUnits', 'userSpaceOnUse');
-  pattern.setAttribute('width', '80');
-  pattern.setAttribute('height', '80');
+  pattern.setAttribute('width', '512');
+  pattern.setAttribute('height', '512');
 
-  // dark base
-  const bg = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-  bg.setAttribute('x', '0');
-  bg.setAttribute('y', '0');
-  bg.setAttribute('width', '80');
-  bg.setAttribute('height', '80');
-  bg.setAttribute('fill', 'rgba(0,0,0,0.18)');
-  pattern.appendChild(bg);
+  const image = document.createElementNS('http://www.w3.org/2000/svg', 'image');
+  image.setAttribute('href', FOG_TEXTURE_URL);
+  image.setAttribute('width', '512');
+  image.setAttribute('height', '512');
+  image.setAttribute('x', '0');
+  image.setAttribute('y', '0');
+  image.setAttribute('preserveAspectRatio', 'none');
 
-  // soft smoky circles
-  const circles = [
-    [12, 18, 16, 'rgba(255,255,255,0.05)'],
-    [42, 22, 20, 'rgba(255,255,255,0.035)'],
-    [66, 14, 14, 'rgba(255,255,255,0.04)'],
-    [18, 54, 22, 'rgba(255,255,255,0.03)'],
-    [52, 50, 18, 'rgba(255,255,255,0.05)'],
-    [70, 66, 12, 'rgba(255,255,255,0.04)']
-  ];
-
-  circles.forEach(([cx, cy, r, fill]) => {
-    const c = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-    c.setAttribute('cx', cx);
-    c.setAttribute('cy', cy);
-    c.setAttribute('r', r);
-    c.setAttribute('fill', fill);
-    pattern.appendChild(c);
-  });
-
-  // faint diagonal streaks
-  const streaks = [
-    ['0,20 20,0 24,4 4,24', 'rgba(255,255,255,0.03)'],
-    ['42,80 80,42 80,50 50,80', 'rgba(255,255,255,0.025)']
-  ];
-
-  streaks.forEach(([points, fill]) => {
-    const p = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
-    p.setAttribute('points', points);
-    p.setAttribute('fill', fill);
-    pattern.appendChild(p);
-  });
-
+  pattern.appendChild(image);
   defs.appendChild(pattern);
   svg.insertBefore(defs, svg.firstChild);
 }
 
-ensureFogTexturePattern();
+ensureFogPattern();
 
-// ----- FOG LAYER GROUP -----
-
-const fogState = {};
-
+// ---------- FOG / REGIONS / SCENES ----------
 const fogLevels = {
-  3: { fillOpacity: 0.94 }, // unknown
-  2: { fillOpacity: 0.45 }, // mapped / informed
-  1: { fillOpacity: 0.00 }  // present
-};
-
-const fogTextureLevels = {
-  3: 0.38,
-  2: 0.16,
-  1: 0.00
+  3: 0.92, // never visited / no info
+  2: 0.48, // mapped / informed
+  1: 0.00  // present
 };
 
 const regions = {};
 const regionState = {};
 const regionScenes = {};
 const sceneMarkers = {};
-const regionTextureLayers = {};
-
-const fogTextureRenderer = L.svg({ padding: 2 });
+const sceneData = {};
+const lockedSceneState = {};
 
 const sceneIcon = L.icon({
   iconUrl: 'icons/vista-marker.png',
@@ -212,8 +182,6 @@ const sceneIcon = L.icon({
   iconAnchor: [18, 44],
   popupAnchor: [0, -36]
 });
-
-const lockedSceneState = {};
 
 const lockedSceneIcon = L.icon({
   iconUrl: 'icons/vista-marker-red.png',
@@ -224,41 +192,33 @@ const lockedSceneIcon = L.icon({
 
 const fogStyle = {
   renderer: fogRenderer,
+  pane: 'fog',
   stroke: false,
-  fillColor: '#111',
-  fillOpacity: 0.62,
+  fillColor: '#ffffff',
+  fillOpacity: fogLevels[3],
   interactive: true
 };
 
-map.createPane('fogTexture');
-map.getPane('fogTexture').style.zIndex = 450;
-map.getPane('fogTexture').style.pointerEvents = 'none';
+function applyFogPatternClass(layer) {
+  if (layer && layer._path) {
+    layer._path.classList.add('fog-pattern-fill');
+  }
+}
 
 function makeRegion(name, coords) {
   const polygon = L.polygon(coords, fogStyle).addTo(map);
 
-  const texturePolygon = L.polygon(coords, {
-    renderer: fogTextureRenderer,
-    pane: 'fogTexture',
-    interactive: false,
-    stroke: false,
-    fillOpacity: 0
-  }).addTo(map);
-
-  // apply the SVG pattern once the path exists
-  texturePolygon.once('add', function () {
-    if (texturePolygon._path) {
-      texturePolygon._path.classList.add('fog-texture-path');
-    }
+  polygon.once('add', function () {
+    applyFogPatternClass(polygon);
   });
 
+  // In case the path already exists by the time this runs
+  setTimeout(() => applyFogPatternClass(polygon), 0);
+
   regions[name] = polygon;
-  regionTextureLayers[name] = texturePolygon;
   regionState[name] = 3;
   regionScenes[name] = [];
 }
-
-const sceneData = {};
 
 function addScene(scene) {
   const isLocked = !!scene.passwordLocked;
@@ -277,17 +237,14 @@ function addScene(scene) {
 
   regionScenes[scene.region].push(scene.id);
 
-  // Bind once
   marker.bindPopup(buildScenePopup(scene));
 
-  // Single click = regular popup
   marker.on('click', function (e) {
     L.DomEvent.stopPropagation(e);
     marker.setPopupContent(buildScenePopup(scene));
     marker.openPopup();
   });
 
-  // Double click = variants popup
   marker.on('dblclick', function (e) {
     L.DomEvent.stopPropagation(e);
     marker.setPopupContent(buildVariantPopup(scene));
@@ -398,7 +355,6 @@ function setSceneVisibility(sceneId, visible) {
     }
   } else {
     marker.closePopup();
-
     if (map.hasLayer(marker)) {
       map.removeLayer(marker);
     }
@@ -414,7 +370,7 @@ function updateRegionScenes(regionName) {
   });
 }
 
-function animateRegionFog(region, textureRegion, fromFog, toFog, fromTexture, toTexture, duration = 500) {
+function animateFog(region, fromOpacity, toOpacity, duration = 500) {
   const start = performance.now();
 
   function step(now) {
@@ -425,18 +381,11 @@ function animateRegionFog(region, textureRegion, fromFog, toFog, fromTexture, to
         ? 2 * progress * progress
         : 1 - Math.pow(-2 * progress + 2, 2) / 2;
 
-    const currentFog = fromFog + (toFog - fromFog) * eased;
-    const currentTexture = fromTexture + (toTexture - fromTexture) * eased;
+    const currentOpacity = fromOpacity + (toOpacity - fromOpacity) * eased;
 
     region.setStyle({
-      fillOpacity: currentFog
+      fillOpacity: currentOpacity
     });
-
-    if (textureRegion) {
-      textureRegion.setStyle({
-        fillOpacity: currentTexture
-      });
-    }
 
     if (progress < 1) {
       requestAnimationFrame(step);
@@ -446,45 +395,38 @@ function animateRegionFog(region, textureRegion, fromFog, toFog, fromTexture, to
   requestAnimationFrame(step);
 }
 
-function setRegionState(regionName, level, animate = true) {
+function setRegionState(regionName, level, animate = true, shouldSave = true) {
   const region = regions[regionName];
-  const textureRegion = regionTextureLayers[regionName];
   if (!region) return;
 
   const currentLevel = regionState[regionName] || 3;
-
-  const fromFog = fogLevels[currentLevel].fillOpacity;
-  const toFog = fogLevels[level].fillOpacity;
-
-  const fromTexture = fogTextureLevels[currentLevel];
-  const toTexture = fogTextureLevels[level];
+  const fromOpacity = fogLevels[currentLevel];
+  const toOpacity = fogLevels[level];
 
   regionState[regionName] = level;
 
   if (animate) {
-    animateRegionFog(region, textureRegion, fromFog, toFog, fromTexture, toTexture, 500);
+    animateFog(region, fromOpacity, toOpacity, 500);
   } else {
     region.setStyle({
-      fillOpacity: toFog
+      fillOpacity: toOpacity
     });
-
-    if (textureRegion) {
-      textureRegion.setStyle({
-        fillOpacity: toTexture
-      });
-    }
   }
 
   updateRegionScenes(regionName);
-  saveMapState();
+
+  if (shouldSave) {
+    saveMapState();
+  }
 }
+
 function unlockScene(sceneId) {
   if (!(sceneId in lockedSceneState)) return false;
   if (lockedSceneState[sceneId] === false) return false;
 
   lockedSceneState[sceneId] = false;
   sceneMarkers[sceneId].setIcon(sceneIcon);
-  
+
   for (const regionName in regionScenes) {
     if (regionScenes[regionName].includes(sceneId)) {
       if (regionState[regionName] === 1) {
@@ -498,24 +440,21 @@ function unlockScene(sceneId) {
   return true;
 }
 
-function cycleRegionState(regionName) {
-  const current = regionState[regionName];
-  const next = current === 3 ? 2 : current === 2 ? 1 : 3;
-  setRegionState(regionName, next);
-}
-
+// ---------- SAVE / LOAD ----------
 function saveMapState() {
   const saveData = {
     regionState,
     lockedSceneState,
     usedCodes: Array.from(usedCodes)
   };
+
   localStorage.setItem(SAVE_KEY, JSON.stringify(saveData));
 }
 
 function loadMapState() {
   const raw = localStorage.getItem(SAVE_KEY);
   if (!raw) return null;
+
   try {
     return JSON.parse(raw);
   } catch (err) {
@@ -531,6 +470,12 @@ function applyLoadedState(saveData) {
     for (const sceneId in saveData.lockedSceneState) {
       if (sceneId in lockedSceneState) {
         lockedSceneState[sceneId] = saveData.lockedSceneState[sceneId];
+
+        if (sceneMarkers[sceneId]) {
+          sceneMarkers[sceneId].setIcon(
+            lockedSceneState[sceneId] ? lockedSceneIcon : sceneIcon
+          );
+        }
       }
     }
   }
@@ -542,12 +487,13 @@ function applyLoadedState(saveData) {
   if (saveData.regionState) {
     for (const regionName in saveData.regionState) {
       if (regionName in regions) {
-        setRegionState(regionName, saveData.regionState[regionName]);
+        setRegionState(regionName, saveData.regionState[regionName], false, false);
       }
     }
   }
 }
 
+// ---------- REGIONS ----------
 makeRegion('eastern_forest', [
   [2200, 4500],
   [2000, 6000],
@@ -566,6 +512,7 @@ makeRegion('desert', [
   [4000, 3500]
 ]);
 
+// ---------- SCENES ----------
 addScene({
   id: 'bridge_town',
   region: 'eastern_forest',
@@ -603,9 +550,15 @@ addScene({
   }
 });
 
-setRegionState('eastern_forest', 3);
-setRegionState('desert', 3);
+// default startup state
+setRegionState('eastern_forest', 3, false, false);
+setRegionState('desert', 3, false, false);
 
+// apply saved state after regions/scenes exist
+const loadedSave = loadMapState();
+applyLoadedState(loadedSave);
+
+// ---------- ARCHIVIST CODES ----------
 const archivistCodes = {
   'EASTERNFORESTGREEN': {
     message: 'Riverlands survey restored.',
@@ -626,51 +579,58 @@ const archivistCodes = {
   },
 
   'WITCHHUTRED': {
-  message: "Hidden Witch's Hut unlocked.",
-  action: {
-    type: 'sceneUnlock',
-    sceneId: 'bridge_town'
+    message: "Hidden Witch's Hut unlocked.",
+    action: {
+      type: 'sceneUnlock',
+      sceneId: 'bridge_town'
+    }
   }
-}
 };
-
-const loadedSave = loadMapState();
-applyLoadedState(loadedSave);
 
 function runArchivistAction(action) {
   if (!action) return false;
+
   if (action.type === 'regionLevel') {
     const current = regionState[action.region];
+
     if (current > action.level) {
       setRegionState(action.region, action.level);
       return true;
     }
+
     return false;
   }
+
   if (action.type === 'sceneUnlock') {
     return unlockScene(action.sceneId);
   }
+
   if (action.type === 'multi') {
     let changed = false;
+
     action.actions.forEach(subAction => {
       if (runArchivistAction(subAction)) {
         changed = true;
       }
     });
+
     return changed;
   }
+
   return false;
 }
 
+// ---------- ARCHIVIST CONSOLE ----------
 const archivistConsole = document.getElementById('archivist-console');
 const archivistToggle = document.getElementById('archivist-toggle');
 const archivistInput = document.getElementById('archivist-code-input');
-archivistInput.addEventListener('input', function () {
-  this.value = this.value.toUpperCase();
-});
 const archivistSubmit = document.getElementById('archivist-submit');
 const archivistStatus = document.getElementById('archivist-status');
 const archivistLog = document.getElementById('archivist-log');
+
+archivistInput.addEventListener('input', function () {
+  this.value = this.value.toUpperCase();
+});
 
 archivistToggle.addEventListener('click', function () {
   archivistConsole.classList.toggle('collapsed');
