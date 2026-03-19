@@ -167,7 +167,7 @@ ensureFogPattern();
 
 // ---------- FOG / REGIONS / SCENES ----------
 const fogLevels = {
-  3: 0.92, // never visited / no info
+  3: 1.00, // never visited / no info
   2: 0.88, // mapped / informed
   1: 0.00  // present
 };
