@@ -295,13 +295,17 @@ function setSceneVisibility(sceneId, visible) {
   const marker = sceneMarkers[sceneId];
   if (!marker) return;
 
-  if (!visible) {
-    marker.setOpacity(0);
+  if (visible) {
+    if (!map.hasLayer(marker)) {
+      marker.addTo(map);
+    }
+  } else {
     marker.closePopup();
-    return;
-  }
 
-  marker.setOpacity(1);
+    if (map.hasLayer(marker)) {
+      map.removeLayer(marker);
+    }
+  }
 }
 
 function updateRegionScenes(regionName) {
