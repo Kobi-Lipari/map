@@ -296,17 +296,18 @@ addScene({
   name: 'Bridge Town2',
   coords: [1850, 5600],
   description: 'A narrow crossing settlement with old timber walkways and suspicious tollkeepers.',
-  url: 'https://i.imgur.com/GEiwF7E.jpeg',
+  url: 'CityMarketplace_Original_Day_Crowded.jpeg',
   passwordLocked: false,
   variants: {
-    Default: 'https://i.imgur.com/GEiwF7E.jpeg',
-    Rain: 'https://i.imgur.com/5M1PkDt.jpeg',
-    Snow: 'https://i.imgur.com/xE8D6KX.jpeg',
-    Fog: 'https://i.imgur.com/iFtXJnr.jpeg',
-    Masaacre: 'https://i.imgur.com/KGVACTV.jpeg',
-    DayEmpty: 'https://i.imgur.com/h7Xxz4I.jpeg',
-    Sunset: 'https://i.imgur.com/gey3FnI.jpeg',
-    SunsetEmpty: 'https://i.imgur.com/Nb5HOmr.jpeg'
+    Default: 'CityMarketplace_Original_Day_Crowded.jpeg',
+    Rain: 'CityMarketplace_Rain.jpeg',
+    Snow: 'CityMarketplace_Winter.jpeg',
+    Fog: 'CityMarketplace_Fog.jpeg',
+    Massacre: 'CityMarketplace_Massacre.jpeg',
+    DayEmpty: 'CityMarketplace_Original_Day_Empty.jpeg',
+    Sunset: 'CityMarketplace_Sunset_Crowd.jpeg',
+    SunsetEmpty: 'CityMarketplace_Sunset_Empty.jpeg',
+    Night: 'CityMarketplace_Original_Night.jpeg'
   }
 });
 
