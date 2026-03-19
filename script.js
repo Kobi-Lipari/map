@@ -92,6 +92,13 @@ map.createPane('fog');
 map.getPane('fog').style.zIndex = 450;
 map.getPane('fog').style.pointerEvents = 'none';
 
+const regions = {};
+const regionState = {};
+const regionScenes = {};
+const sceneMarkers = {};
+const sceneData = {};
+const lockedSceneState = {};
+
 function reapplyAllFogPatterns() {
   Object.values(regions).forEach(region => applyFogPattern(region));
 }
@@ -233,13 +240,6 @@ const fogLevels = {
   2: 0.50, // mapped / informed
   1: 0.00  // present
 };
-
-const regions = {};
-const regionState = {};
-const regionScenes = {};
-const sceneMarkers = {};
-const sceneData = {};
-const lockedSceneState = {};
 
 const sceneIcon = L.icon({
   iconUrl: 'icons/vista-marker.png',
