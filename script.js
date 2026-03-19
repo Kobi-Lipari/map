@@ -122,7 +122,16 @@ const regionScenes = {};
 const sceneMarkers = {};
 
 const sceneIcon = L.icon({
-  iconUrl: 'https://i.imgur.com/AiZmxL8.png',
+  iconUrl: 'icons/vista-marker.png',
+  iconSize: [36, 44],
+  iconAnchor: [18, 44],
+  popupAnchor: [0, -36]
+});
+
+const lockedSceneState = {};
+
+const lockedSceneIcon = L.icon({
+  iconUrl: 'icons/vista-marker.png',
   iconSize: [36, 44],
   iconAnchor: [18, 44],
   popupAnchor: [0, -36]
@@ -341,38 +350,6 @@ function runArchivistAction(action) {
   }
 
   return false;
-}
-
-function submitArchivistCode() {
-  const code = normalizeCode(archivistInput.value);
-
-  if (!code) {
-    setArchivistStatus('Enter a code first.');
-    return;
-  }
-
-  const entry = archivistCodes[code];
-
-  if (!entry) {
-    setArchivistStatus(`No archive match found for "${code}".`);
-    return;
-  }
-
-  if (usedCodes.has(code)) {
-    setArchivistStatus(`"${code}" has already been recorded.`);
-    return;
-  }
-
-  const changed = runArchivistAction(entry.action);
-
-  if (changed) {
-    usedCodes.add(code);
-    setArchivistStatus(entry.message);
-    addArchivistLog(`${code} — ${entry.message}`);
-    archivistInput.value = '';
-  } else {
-    setArchivistStatus(`"${code}" provided no new information.`);
-  }
 }
 
 const archivistConsole = document.getElementById('archivist-console');
