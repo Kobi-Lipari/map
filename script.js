@@ -92,6 +92,12 @@ map.createPane('fog');
 map.getPane('fog').style.zIndex = 450;
 map.getPane('fog').style.pointerEvents = 'auto';
 
+function reapplyAllFogPatterns() {
+  Object.values(regions).forEach(region => applyFogPattern(region));
+}
+
+map.on('zoomend moveend viewreset', reapplyAllFogPatterns);
+
 const fogRenderer = L.svg({ padding: 2 });
 
 for (let row = 0; row < rows; row++) {
@@ -115,7 +121,7 @@ const bounds = [[0, 0], [mapHeight, mapWidth]];
 map.fitBounds(bounds);
 
 // ---------- FOG PATTERN ----------
-const FOG_TEXTURE_URL = 'textures/fog-tile.png';
+const FOG_TEXTURE_URL = new URL('textures/fog-tile.png', window.location.href).href;
 
 function ensureFogPattern() {
   const pane = map.getPane('fog');
@@ -205,8 +211,8 @@ const fogStyle = {
 function applyFogPattern(layer) {
   if (!layer || !layer._path) return;
 
-  layer._path.setAttribute('fill', 'url(#fogPatternImage)');
-  layer._path.setAttribute('stroke', 'none');
+  layer._path.style.setProperty('fill', 'url(#fogPatternImage)', 'important');
+  layer._path.style.setProperty('stroke', 'none', 'important');
 }
 
 function applyFogPatternClass(layer) {
@@ -217,6 +223,16 @@ function applyFogPatternClass(layer) {
 
 function makeRegion(name, coords) {
   const polygon = L.polygon(coords, fogStyle).addTo(map);
+
+  function waitForPath() {
+    if (polygon._path) {
+      applyFogPattern(polygon);
+    } else {
+      requestAnimationFrame(waitForPath);
+    }
+  }
+
+  waitForPath();
 
   regions[name] = polygon;
   regionState[name] = 3;
