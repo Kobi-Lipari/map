@@ -132,7 +132,7 @@ const sceneIcon = L.icon({
 const lockedSceneState = {};
 
 const lockedSceneIcon = L.icon({
-  iconUrl: 'icons/vista-marker-red.png',
+  iconUrl: 'icons/vista-marker-red.jpg',
   iconSize: [36, 44],
   iconAnchor: [18, 44],
   popupAnchor: [0, -36]
