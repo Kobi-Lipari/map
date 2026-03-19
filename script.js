@@ -107,6 +107,80 @@ for (let row = 0; row < rows; row++) {
 const bounds = [[0, 0], [mapHeight, mapWidth]];
 map.fitBounds(bounds);
 
+function ensureFogTexturePattern() {
+  const svgPane = map.getPane('fogTexture');
+  if (!svgPane) return;
+
+  let svg = svgPane.querySelector('svg');
+  if (!svg) {
+    // Force Leaflet to create an SVG renderer in that pane
+    L.polygon([[0,0],[0,1],[1,1]], {
+      renderer: fogTextureRenderer,
+      pane: 'fogTexture',
+      interactive: false,
+      opacity: 0,
+      fillOpacity: 0
+    }).addTo(map);
+
+    svg = svgPane.querySelector('svg');
+  }
+
+  if (!svg) return;
+  if (svg.querySelector('#fogTexturePattern')) return;
+
+  const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+  const pattern = document.createElementNS('http://www.w3.org/2000/svg', 'pattern');
+  pattern.setAttribute('id', 'fogTexturePattern');
+  pattern.setAttribute('patternUnits', 'userSpaceOnUse');
+  pattern.setAttribute('width', '80');
+  pattern.setAttribute('height', '80');
+
+  // dark base
+  const bg = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+  bg.setAttribute('x', '0');
+  bg.setAttribute('y', '0');
+  bg.setAttribute('width', '80');
+  bg.setAttribute('height', '80');
+  bg.setAttribute('fill', 'rgba(0,0,0,0.18)');
+  pattern.appendChild(bg);
+
+  // soft smoky circles
+  const circles = [
+    [12, 18, 16, 'rgba(255,255,255,0.05)'],
+    [42, 22, 20, 'rgba(255,255,255,0.035)'],
+    [66, 14, 14, 'rgba(255,255,255,0.04)'],
+    [18, 54, 22, 'rgba(255,255,255,0.03)'],
+    [52, 50, 18, 'rgba(255,255,255,0.05)'],
+    [70, 66, 12, 'rgba(255,255,255,0.04)']
+  ];
+
+  circles.forEach(([cx, cy, r, fill]) => {
+    const c = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    c.setAttribute('cx', cx);
+    c.setAttribute('cy', cy);
+    c.setAttribute('r', r);
+    c.setAttribute('fill', fill);
+    pattern.appendChild(c);
+  });
+
+  // faint diagonal streaks
+  const streaks = [
+    ['0,20 20,0 24,4 4,24', 'rgba(255,255,255,0.03)'],
+    ['42,80 80,42 80,50 50,80', 'rgba(255,255,255,0.025)']
+  ];
+
+  streaks.forEach(([points, fill]) => {
+    const p = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+    p.setAttribute('points', points);
+    p.setAttribute('fill', fill);
+    pattern.appendChild(p);
+  });
+
+  defs.appendChild(pattern);
+  svg.insertBefore(defs, svg.firstChild);
+}
+
+ensureFogTexturePattern();
 
 // ----- FOG LAYER GROUP -----
 
@@ -118,10 +192,19 @@ const fogLevels = {
   1: { fillOpacity: 0.00 }  // present
 };
 
+const fogTextureLevels = {
+  3: 0.38,
+  2: 0.16,
+  1: 0.00
+};
+
 const regions = {};
 const regionState = {};
 const regionScenes = {};
 const sceneMarkers = {};
+const regionTextureLayers = {};
+
+const fogTextureRenderer = L.svg({ padding: 2 });
 
 const sceneIcon = L.icon({
   iconUrl: 'icons/vista-marker.png',
@@ -147,17 +230,32 @@ const fogStyle = {
   interactive: true
 };
 
+map.createPane('fogTexture');
+map.getPane('fogTexture').style.zIndex = 450;
+map.getPane('fogTexture').style.pointerEvents = 'none';
+
 function makeRegion(name, coords) {
   const polygon = L.polygon(coords, fogStyle).addTo(map);
 
+  const texturePolygon = L.polygon(coords, {
+    renderer: fogTextureRenderer,
+    pane: 'fogTexture',
+    interactive: false,
+    stroke: false,
+    fillOpacity: 0
+  }).addTo(map);
+
+  // apply the SVG pattern once the path exists
+  texturePolygon.once('add', function () {
+    if (texturePolygon._path) {
+      texturePolygon._path.classList.add('fog-texture-path');
+    }
+  });
+
   regions[name] = polygon;
+  regionTextureLayers[name] = texturePolygon;
   regionState[name] = 3;
   regionScenes[name] = [];
-
-  polygon.on('dblclick', function (e) {
-    L.DomEvent.stopPropagation(e);
-    cycleRegionState(name);
-  });
 }
 
 const sceneData = {};
@@ -316,20 +414,70 @@ function updateRegionScenes(regionName) {
   });
 }
 
-function setRegionState(regionName, level) {
+function animateRegionFog(region, textureRegion, fromFog, toFog, fromTexture, toTexture, duration = 500) {
+  const start = performance.now();
+
+  function step(now) {
+    const progress = Math.min((now - start) / duration, 1);
+
+    const eased =
+      progress < 0.5
+        ? 2 * progress * progress
+        : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+
+    const currentFog = fromFog + (toFog - fromFog) * eased;
+    const currentTexture = fromTexture + (toTexture - fromTexture) * eased;
+
+    region.setStyle({
+      fillOpacity: currentFog
+    });
+
+    if (textureRegion) {
+      textureRegion.setStyle({
+        fillOpacity: currentTexture
+      });
+    }
+
+    if (progress < 1) {
+      requestAnimationFrame(step);
+    }
+  }
+
+  requestAnimationFrame(step);
+}
+
+function setRegionState(regionName, level, animate = true) {
   const region = regions[regionName];
+  const textureRegion = regionTextureLayers[regionName];
   if (!region) return;
+
+  const currentLevel = regionState[regionName] || 3;
+
+  const fromFog = fogLevels[currentLevel].fillOpacity;
+  const toFog = fogLevels[level].fillOpacity;
+
+  const fromTexture = fogTextureLevels[currentLevel];
+  const toTexture = fogTextureLevels[level];
 
   regionState[regionName] = level;
 
-  region.setStyle({
-    fillOpacity: fogLevels[level].fillOpacity
-  });
+  if (animate) {
+    animateRegionFog(region, textureRegion, fromFog, toFog, fromTexture, toTexture, 500);
+  } else {
+    region.setStyle({
+      fillOpacity: toFog
+    });
+
+    if (textureRegion) {
+      textureRegion.setStyle({
+        fillOpacity: toTexture
+      });
+    }
+  }
 
   updateRegionScenes(regionName);
   saveMapState();
 }
-
 function unlockScene(sceneId) {
   if (!(sceneId in lockedSceneState)) return false;
   if (lockedSceneState[sceneId] === false) return false;
