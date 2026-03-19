@@ -179,15 +179,21 @@ function addScene(scene) {
 
   regionScenes[scene.region].push(scene.id);
 
-  // Single click: normal popup
-  marker.on('click', function () {
-    marker.bindPopup(buildScenePopup(scene)).openPopup();
+  // Bind once
+  marker.bindPopup(buildScenePopup(scene));
+
+  // Single click = regular popup
+  marker.on('click', function (e) {
+    L.DomEvent.stopPropagation(e);
+    marker.setPopupContent(buildScenePopup(scene));
+    marker.openPopup();
   });
 
-  // Double click: variant chooser popup
+  // Double click = variants popup
   marker.on('dblclick', function (e) {
     L.DomEvent.stopPropagation(e);
-    marker.bindPopup(buildVariantPopup(scene)).openPopup();
+    marker.setPopupContent(buildVariantPopup(scene));
+    marker.openPopup();
   });
 }
 
