@@ -6,6 +6,7 @@ const cols = 7;
 const pieceWidth = mapWidth / cols;
 const pieceHeight = mapHeight / rows;
 const overlap = 1;
+const usedCodes = new Set();
 const SAVE_KEY = '_save_v1';
 
 const imageUrls = [
@@ -484,8 +485,6 @@ const archivistCodes = {
 
 const loadedSave = loadMapState();
 applyLoadedState(loadedSave);
-
-const usedCodes = new Set();
 
 function runArchivistAction(action) {
   if (!action) return false;
