@@ -361,10 +361,10 @@ addScene({
   name: 'Bridge Town2',
   coords: [1850, 5600],
   description: 'A narrow crossing settlement with old timber walkways and suspicious tollkeepers.',
-  url: 'scenes/CityMarketplace_Original_Day_Crowded.jpeg',
+  url: 'scenes/CityMarketplace_Original_Day_Crowd.jpeg',
   passwordLocked: false,
   variants: {
-    Default: 'scenes/CityMarketplace_Original_Day_Crowded.jpeg',
+    Default: 'scenes/CityMarketplace_Original_Day_Crowd.jpeg',
     Rain: 'scenes/CityMarketplace_Rain.jpeg',
     Snow: 'scenes/CityMarketplace_Winter.jpeg',
     Fog: 'scenes/CityMarketplace_Fog.jpeg',
