@@ -130,3 +130,8 @@ html, body {
   max-height: 160px;
   overflow: auto;
 }
+
+.fog-pattern-fill {
+  fill: url(#fogPatternImage) !important;
+  stroke: none !important;
+}
