@@ -166,9 +166,8 @@ function addScene(scene) {
   const isLocked = !!scene.passwordLocked;
 
   const marker = L.marker(scene.coords, {
-    icon: isLocked ? lockedSceneIcon : sceneIcon,
-    opacity: 0
-  }).addTo(map);
+    icon: isLocked ? lockedSceneIcon : sceneIcon
+  });
 
   sceneData[scene.id] = scene;
   sceneMarkers[scene.id] = marker;
