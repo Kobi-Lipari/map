@@ -85,6 +85,9 @@ const map = L.map('map', {
   closePopupOnClick: false
 });
 
+const bounds = [[0, 0], [1000, 1600]];
+const image = L.imageOverlay('your-map-image.png', bounds).addTo(map);
+map.fitBounds(bounds);
 map.createPane('tiles');
 map.getPane('tiles').style.zIndex = 200;
 
