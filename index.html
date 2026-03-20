@@ -1,44 +1,61 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Archivist Map</title>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Archivist Map</title>
 
-  <link
-    rel="stylesheet"
-    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-  />
-  <link rel="stylesheet" href="style.css" />
-</head>
-<body>
-  <div -d="mapp-wrapper">
-  <div id="map"></div>
-  <div id="fog-overlay"></div>
-  </div>
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    />
+    <link rel="stylesheet" href="style.css" />
+  </head>
 
-  <div id="archivist-console" class="collapsed">
-    <div id="archivist-header">
-      <span>Archivist Console</span>
-      <button id="archivist-toggle" type="button">+</button>
-    </div>
+  <body>
+    <div id="map-wrapper">
+      <div id="map"></div>
 
-    <div id="archivist-body">
-      <div class="archivist-row">
-        <input id="archivist-code-input" type="text" placeholder="Enter discovery code" />
-        <button id="archivist-submit" type="button">Unlock</button>
+      <svg id="fog-clip-svg" width="0" height="0" style="position: absolute">
+        <defs>
+          <clipPath id="fog-clip" clipPathUnits="userSpaceOnUse"></clipPath>
+        </defs>
+      </svg>
+
+      <div id="fog-back-container">
+        <div class="fog-sheet" id="fog-sheet-1"></div>
+        <div class="fog-sheet" id="fog-sheet-2"></div>
       </div>
 
-      <div id="archivist-status">Awaiting input.</div>
+      <div id="fog-front"></div>
+    </div>
 
-      <div id="archivist-log-wrap">
-        <div class="archivist-label">Recovered Knowledge</div>
-        <ul id="archivist-log"></ul>
+    <div id="archivist-console" class="collapsed">
+      <div id="archivist-header">
+        <span>Archivist Console</span>
+        <button id="archivist-toggle" type="button">+</button>
+      </div>
+
+      <div id="archivist-body">
+        <div class="archivist-row">
+          <input
+            id="archivist-code-input"
+            type="text"
+            placeholder="Enter discovery code"
+          />
+          <button id="archivist-submit" type="button">Unlock</button>
+        </div>
+
+        <div id="archivist-status">Awaiting input.</div>
+
+        <div id="archivist-log-wrap">
+          <div class="archivist-label">Recovered Knowledge</div>
+          <ul id="archivist-log"></ul>
+        </div>
       </div>
     </div>
-  </div>
 
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="script.js"></script>
-</body>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="script.js"></script>
+  </body>
 </html>
