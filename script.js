@@ -1,15 +1,3 @@
-const mapWidth = 8192;
-const mapHeight = 5966;
-
-const rows = 7;
-const cols = 7;
-const pieceWidth = mapWidth / cols;
-const pieceHeight = mapHeight / rows;
-const overlap = 1;
-
-const usedCodes = new Set();
-const SAVE_KEY = '_save_v2';
-
 // ---------- MAP TILES ----------
 const imageUrls = [
   /*G1*/ 'tiles/image_part_043.png',
@@ -69,8 +57,20 @@ const imageUrls = [
   /*A7*/ 'tiles/image_part_007.png'
 ];
 
+const mapWidth = 8192;
+const mapHeight = 5966;
+
+const rows = 7;
+const cols = 7;
+const pieceWidth = mapWidth / cols;
+const pieceHeight = mapHeight / rows;
+const overlap = 1;
+
+const usedCodes = new Set();
+const SAVE_KEY = "_save_v2";
+
 // ---------- MAP ----------
-const map = L.map('map', {
+const map = L.map("map", {
   crs: L.CRS.Simple,
   minZoom: -2,
   maxZoom: 3,
@@ -85,15 +85,16 @@ const map = L.map('map', {
   closePopupOnClick: false
 });
 
-const bounds = [[0, 0], [1000, 1600]];
-const image = L.imageOverlay('your-map-image.png', bounds).addTo(map);
+const bounds = [[0, 0], [5966, 8192]];
+const image = L.imageOverlay("your-map-image.png", bounds).addTo(map);
 map.fitBounds(bounds);
-map.createPane('tiles');
-map.getPane('tiles').style.zIndex = 200;
 
-map.createPane('fog');
-map.getPane('fog').style.zIndex = 450;
-map.getPane('fog').style.pointerEvents = 'none';
+map.createPane("tiles");
+map.getPane("tiles").style.zIndex = 200;
+
+map.createPane("fog");
+map.getPane("fog").style.zIndex = 450;
+map.getPane("fog").style.pointerEvents = "none";
 
 const regions = {};
 const regionState = {};
@@ -102,11 +103,44 @@ const sceneMarkers = {};
 const sceneData = {};
 const lockedSceneState = {};
 
-function reapplyAllFogPatterns() {
-  Object.values(regions).forEach(region => applyFogPattern(region));
+const fogClip = document.getElementById("fog-clip");
+const mapWrapper = document.getElementById("map-wrapper");
+
+function getSingleRing(latlngs) {
+  if (!Array.isArray(latlngs) || latlngs.length === 0) return [];
+  return Array.isArray(latlngs[0]) ? latlngs[0] : latlngs;
 }
 
-map.on('zoomend moveend viewreset', reapplyAllFogPatterns);
+function updateFogClipPath() {
+  if (!fogClip) return;
+
+  fogClip.innerHTML = "";
+
+  Object.entries(regions).forEach(([regionName, regionLayer]) => {
+    const level = regionState[regionName];
+    if (level === 1) return;
+
+    const latlngs = getSingleRing(regionLayer.getLatLngs());
+    if (!latlngs.length) return;
+
+    const points = latlngs
+      .map((latlng) => {
+        const p = map.latLngToContainerPoint(latlng);
+        return `${p.x},${p.y}`;
+      })
+      .join(" ");
+
+    const poly = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
+    poly.setAttribute("points", points);
+    fogClip.appendChild(poly);
+  });
+}
+
+function reapplyAllFogPatterns() {
+  Object.values(regions).forEach((region) => applyFogPattern(region));
+}
+
+map.on("zoomend moveend viewreset", reapplyAllFogPatterns);
 
 const fogRenderer = L.svg({ padding: 2 });
 
@@ -121,121 +155,137 @@ for (let row = 0; row < rows; row++) {
     const x2 = (col + 1) * pieceWidth + (col < cols - 1 ? overlap : 0);
 
     L.imageOverlay(url, [[y1, x1], [y2, x2]], {
-      pane: 'tiles',
+      pane: "tiles",
       interactive: false
     }).addTo(map);
   }
 }
 
-const bounds = [[0, 0], [mapHeight, mapWidth]];
-map.fitBounds(bounds);
+const cloudImages = [
+  "https://i.imgur.com/TW6aVCA.png",
+  "https://i.imgur.com/DX5176n.png",
+  "https://i.imgur.com/WnfN1N5.png",
+  "https://i.imgur.com/kdSoftz.png",
+  "https://i.imgur.com/5KgMzdZ.png",
+  "https://i.imgur.com/AMb9qxM.png"
+];
 
-// ---------- GENERATED FOG PATTERN ----------
-const FOG_PATTERN_SIZE = 320;
+const container = document.getElementById("fog-back-container");
+const sheet1 = document.getElementById("fog-sheet-1");
+const sheet2 = document.getElementById("fog-sheet-2");
 
-function ensureFogPattern() {
-  const pane = map.getPane('fog');
-  if (!pane) return;
+const CLOUD_WIDTH = 200;
+const CLOUD_HEIGHT = 200;
+const COL_STEP = 145;
+const ROW_STEP = 145;
 
-  let svg = pane.querySelector('svg');
+let sheetHeight = 0;
 
-  if (!svg) {
-    const temp = L.polygon([[0, 0], [0, 1], [1, 1]], {
-      renderer: fogRenderer,
-      pane: 'fog',
-      interactive: false,
-      stroke: false,
-      fillOpacity: 0
-    }).addTo(map);
-
-    svg = pane.querySelector('svg');
-    map.removeLayer(temp);
-  }
-
-  if (!svg) return;
-  if (svg.querySelector('#fogPatternImage')) return;
-
-  const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
-
-  const filter = document.createElementNS('http://www.w3.org/2000/svg', 'filter');
-  filter.setAttribute('id', 'fogBlur');
-  const blur = document.createElementNS('http://www.w3.org/2000/svg', 'feGaussianBlur');
-  blur.setAttribute('stdDeviation', '18');
-  filter.appendChild(blur);
-  defs.appendChild(filter);
-
-  const pattern = document.createElementNS('http://www.w3.org/2000/svg', 'pattern');
-  pattern.setAttribute('id', 'fogPatternImage');
-  pattern.setAttribute('patternUnits', 'userSpaceOnUse');
-  pattern.setAttribute('width', String(FOG_PATTERN_SIZE));
-  pattern.setAttribute('height', String(FOG_PATTERN_SIZE));
-
-  // dark base
-  const bg = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-  bg.setAttribute('x', '0');
-  bg.setAttribute('y', '0');
-  bg.setAttribute('width', String(FOG_PATTERN_SIZE));
-  bg.setAttribute('height', String(FOG_PATTERN_SIZE));
-  bg.setAttribute('fill', '#1a1d24');
-  bg.setAttribute('fill-opacity', '0.88');
-  pattern.appendChild(bg);
-
-  // cloud masses
-  const clouds = [
-    [70, 70, 85, 55, 0.16],
-    [170, 95, 100, 65, 0.14],
-    [265, 70, 80, 50, 0.15],
-
-    [95, 180, 100, 65, 0.13],
-    [210, 190, 120, 75, 0.16],
-    [285, 235, 70, 45, 0.12],
-
-    [60, 280, 75, 45, 0.13],
-    [170, 270, 105, 65, 0.14],
-    [270, 285, 88, 55, 0.13]
-  ];
-
-  clouds.forEach(([cx, cy, rx, ry, opacity]) => {
-    const e = document.createElementNS('http://www.w3.org/2000/svg', 'ellipse');
-    e.setAttribute('cx', String(cx));
-    e.setAttribute('cy', String(cy));
-    e.setAttribute('rx', String(rx));
-    e.setAttribute('ry', String(ry));
-    e.setAttribute('fill', '#ffffff');
-    e.setAttribute('fill-opacity', String(opacity));
-    e.setAttribute('filter', 'url(#fogBlur)');
-    pattern.appendChild(e);
-  });
-
-  // lighter wisps
-  const wisps = [
-    [35, 35, 40, 20, 0.08],
-    [300, 40, 35, 18, 0.08],
-    [40, 145, 50, 24, 0.06],
-    [310, 160, 40, 20, 0.07],
-    [55, 315, 45, 20, 0.07],
-    [250, 315, 55, 24, 0.06]
-  ];
-
-  wisps.forEach(([cx, cy, rx, ry, opacity]) => {
-    const e = document.createElementNS('http://www.w3.org/2000/svg', 'ellipse');
-    e.setAttribute('cx', String(cx));
-    e.setAttribute('cy', String(cy));
-    e.setAttribute('rx', String(rx));
-    e.setAttribute('ry', String(ry));
-    e.setAttribute('fill', '#ffffff');
-    e.setAttribute('fill-opacity', String(opacity));
-    e.setAttribute('filter', 'url(#fogBlur)');
-    pattern.appendChild(e);
-  });
-
-  defs.appendChild(pattern);
-  svg.insertBefore(defs, svg.firstChild);
-
-  console.log('Inline fog pattern injected.');
+function randomCloud() {
+  return cloudImages[Math.floor(Math.random() * cloudImages.length)];
 }
 
-ensureFogPattern();
+function randomOrientation() {
+  const rotations = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85];
+  const flipX = Math.random() < 0.5 ? 1 : -1;
+  const flipY = Math.random() < 0.5 ? 1 : -1;
+  const angle = rotations[Math.floor(Math.random() * rotations.length)];
+
+  return `rotate(${angle}deg) scale(${flipX}, ${flipY})`;
+}
+
+function buildFogSheet(sheet) {
+  sheet.innerHTML = "";
+
+  const containerWidth = container.offsetWidth;
+  const containerHeight = container.offsetHeight;
+
+  const cloud_cols = Math.ceil(containerWidth / COL_STEP) + 4;
+  const cloud_rows = Math.ceil(containerHeight / ROW_STEP) + 4;
+
+  sheetHeight = cloud_rows * ROW_STEP;
+  sheet.style.height = `${sheetHeight}px`;
+
+  for (let r = 0; r < cloud_rows; r++) {
+    for (let c = 0; c < cloud_cols; c++) {
+      const img = document.createElement("img");
+      img.className = "fog-cloud";
+      img.src = randomCloud();
+      img.alt = "";
+
+      const offsetX = r % 2 === 1 ? -(COL_STEP / 2) : 0;
+
+      img.style.left = `${c * COL_STEP + offsetX}px`;
+      img.style.top = `${r * ROW_STEP}px`;
+      img.style.transform = randomOrientation();
+
+      sheet.appendChild(img);
+    }
+  }
+}
+
+function buildFogSystem() {
+  buildFogSheet(sheet1);
+  buildFogSheet(sheet2);
+
+  sheet1._y = 0;
+  sheet2._y = -sheetHeight;
+
+  sheet1.style.transform = `translateY(${sheet1._y}px)`;
+  sheet2.style.transform = `translateY(${sheet2._y}px)`;
+}
+
+buildFogSystem();
+
+const driftSpeed = 0.06;
+
+function animateCloudSheet() {
+  sheet1._y += driftSpeed;
+  sheet2._y += driftSpeed;
+
+  if (sheet1._y >= sheetHeight) {
+    sheet1._y = sheet2._y - sheetHeight;
+    buildFogSheet(sheet1);
+  }
+
+  if (sheet2._y >= sheetHeight) {
+    sheet2._y = sheet1._y - sheetHeight;
+    buildFogSheet(sheet2);
+  }
+
+  sheet1.style.transform = `translateY(${sheet1._y}px)`;
+  sheet2.style.transform = `translateY(${sheet2._y}px)`;
+
+  requestAnimationFrame(animateCloudSheet);
+}
+
+function animateRegionFog(region, fromOpacity, toOpacity, duration = 500) {
+  const start = performance.now();
+
+  function step(now) {
+    const progress = Math.min((now - start) / duration, 1);
+
+    const eased =
+      progress < 0.5
+        ? 2 * progress * progress
+        : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+
+    const currentOpacity = fromOpacity + (toOpacity - fromOpacity) * eased;
+
+    region.setStyle({
+      fillOpacity: currentOpacity
+    });
+
+    if (progress < 1) {
+      requestAnimationFrame(step);
+    }
+  }
+
+  requestAnimationFrame(step);
+}
+
+animateCloudSheet();
+window.addEventListener("resize", buildFogSystem);
 
 // ---------- FOG / REGIONS / SCENES ----------
 const fogLevels = {
@@ -245,14 +295,14 @@ const fogLevels = {
 };
 
 const sceneIcon = L.icon({
-  iconUrl: 'icons/vista-marker.png',
+  iconUrl: "icons/vista-marker.png",
   iconSize: [36, 44],
   iconAnchor: [18, 44],
   popupAnchor: [0, -36]
 });
 
 const lockedSceneIcon = L.icon({
-  iconUrl: 'icons/vista-marker-red.png',
+  iconUrl: "icons/vista-marker-red.png",
   iconSize: [36, 44],
   iconAnchor: [18, 44],
   popupAnchor: [0, -36]
@@ -260,7 +310,7 @@ const lockedSceneIcon = L.icon({
 
 const fogStyle = {
   renderer: fogRenderer,
-  pane: 'fog',
+  pane: "fog",
   stroke: false,
   fillOpacity: fogLevels[3],
   interactive: false
@@ -268,9 +318,8 @@ const fogStyle = {
 
 function applyFogPattern(layer) {
   if (!layer || !layer._path) return;
-
-  layer._path.setAttribute('fill', 'url(#fogPatternImage)');
-  layer._path.setAttribute('stroke', 'none');
+  layer._path.setAttribute("fill", "url(#fogPatternImage)");
+  layer._path.setAttribute("stroke", "none");
 }
 
 function makeRegion(name, coords) {
@@ -310,13 +359,13 @@ function addScene(scene) {
 
   marker.bindPopup(buildScenePopup(scene));
 
-  marker.on('click', function (e) {
+  marker.on("click", function (e) {
     L.DomEvent.stopPropagation(e);
     marker.setPopupContent(buildScenePopup(scene));
     marker.openPopup();
   });
 
-  marker.on('dblclick', function (e) {
+  marker.on("dblclick", function (e) {
     L.DomEvent.stopPropagation(e);
     marker.setPopupContent(buildVariantPopup(scene));
     marker.openPopup();
@@ -327,7 +376,7 @@ function buildScenePopup(scene) {
   const isLocked = !!lockedSceneState[scene.id];
   const hintText = scene.lockHint
     ? `<p style="margin:0 0 10px 0; color:#d66;"><em>${scene.lockHint}</em></p>`
-    : '';
+    : "";
 
   const linkHtml = isLocked
     ? `<span style="
@@ -354,7 +403,7 @@ function buildScenePopup(scene) {
     <div style="min-width:240px;">
       <h3 style="margin:0 0 8px 0;">${scene.name}</h3>
       <p style="margin:0 0 10px 0;">${scene.description}</p>
-      ${isLocked ? hintText : ''}
+      ${isLocked ? hintText : ""}
       ${linkHtml}
     </div>
   `;
@@ -371,7 +420,7 @@ function buildVariantPopup(scene) {
         ${
           scene.lockHint
             ? `<p style="margin:0 0 10px 0; color:#d66;"><em>${scene.lockHint}</em></p>`
-            : ''
+            : ""
         }
         <span style="
           display:inline-block;
@@ -405,7 +454,7 @@ function buildVariantPopup(scene) {
         </div>
       `;
     })
-    .join('');
+    .join("");
 
   return `
     <div style="min-width:240px;">
@@ -436,34 +485,9 @@ function updateRegionScenes(regionName) {
   const level = regionState[regionName];
   const ids = regionScenes[regionName] || [];
 
-  ids.forEach(id => {
+  ids.forEach((id) => {
     setSceneVisibility(id, level === 1);
   });
-}
-
-function animateFog(region, fromOpacity, toOpacity, duration = 500) {
-  const start = performance.now();
-
-  function step(now) {
-    const progress = Math.min((now - start) / duration, 1);
-
-    const eased =
-      progress < 0.5
-        ? 2 * progress * progress
-        : 1 - Math.pow(-2 * progress + 2, 2) / 2;
-
-    const currentOpacity = fromOpacity + (toOpacity - fromOpacity) * eased;
-
-    region.setStyle({
-      fillOpacity: currentOpacity
-    });
-
-    if (progress < 1) {
-      requestAnimationFrame(step);
-    }
-  }
-
-  requestAnimationFrame(step);
 }
 
 function setRegionState(regionName, level, animate = true, shouldSave = true) {
@@ -477,14 +501,13 @@ function setRegionState(regionName, level, animate = true, shouldSave = true) {
   regionState[regionName] = level;
 
   if (animate) {
-    animateFog(region, fromOpacity, toOpacity, 500);
+    animateRegionFog(region, fromOpacity, toOpacity, 500);
   } else {
-    region.setStyle({
-      fillOpacity: toOpacity
-    });
+    region.setStyle({ fillOpacity: toOpacity });
   }
 
   updateRegionScenes(regionName);
+  updateFogClipPath();
 
   if (shouldSave) {
     saveMapState();
@@ -529,7 +552,7 @@ function loadMapState() {
   try {
     return JSON.parse(raw);
   } catch (err) {
-    console.error('Failed to parse save data:', err);
+    console.error("Failed to parse save data:", err);
     return null;
   }
 }
@@ -552,7 +575,7 @@ function applyLoadedState(saveData) {
   }
 
   if (Array.isArray(saveData.usedCodes)) {
-    saveData.usedCodes.forEach(code => usedCodes.add(code));
+    saveData.usedCodes.forEach((code) => usedCodes.add(code));
   }
 
   if (saveData.regionState) {
@@ -565,7 +588,7 @@ function applyLoadedState(saveData) {
 }
 
 // ---------- REGIONS ----------
-makeRegion('eastern_forest', [
+makeRegion("eastern_forest", [
   [2200, 4500],
   [2000, 6000],
   [2600, 7000],
@@ -574,7 +597,7 @@ makeRegion('eastern_forest', [
   [3000, 4200]
 ]);
 
-makeRegion('desert', [
+makeRegion("desert", [
   [3200, 4000],
   [3500, 6500],
   [4500, 7500],
@@ -585,75 +608,76 @@ makeRegion('desert', [
 
 // ---------- SCENES ----------
 addScene({
-  id: 'bridge_town',
-  region: 'eastern_forest',
-  name: 'Bridge Town',
+  id: "bridge_town",
+  region: "eastern_forest",
+  name: "Bridge Town",
   coords: [2850, 5600],
-  description: 'A narrow crossing settlement with old timber walkways and suspicious tollkeepers.',
-  lockHint: 'The old woman in Bridge Town mentioned that the path opens for those who know the hut’s true name.',
-  url: 'https://example.com/bridge-town',
+  description: "A narrow crossing settlement with old timber walkways and suspicious tollkeepers.",
+  lockHint: "The old woman in Bridge Town mentioned that the path opens for those who know the hut’s true name.",
+  url: "https://example.com/bridge-town",
   passwordLocked: true,
   variants: {
-    Default: 'https://example.com/bridge-town',
-    Rain: 'https://example.com/bridge-town-rain',
-    Snow: 'https://example.com/bridge-town-snow'
+    Default: "https://example.com/bridge-town",
+    Rain: "https://example.com/bridge-town-rain",
+    Snow: "https://example.com/bridge-town-snow"
   }
 });
 
 addScene({
-  id: 'bridge_town2',
-  region: 'eastern_forest',
-  name: 'Bridge Town2',
+  id: "bridge_town2",
+  region: "eastern_forest",
+  name: "Bridge Town2",
   coords: [1850, 5600],
-  description: 'A narrow crossing settlement with old timber walkways and suspicious tollkeepers.',
-  url: 'scenes/CityMarketplace_Original_Day_Crowd.jpeg',
+  description: "A narrow crossing settlement with old timber walkways and suspicious tollkeepers.",
+  url: "scenes/CityMarketplace_Original_Day_Crowd.jpeg",
   passwordLocked: false,
   variants: {
-    Default: 'scenes/CityMarketplace_Original_Day_Crowd.jpeg',
-    Rain: 'scenes/CityMarketplace_Rain.jpeg',
-    Snow: 'scenes/CityMarketplace_Winter.jpeg',
-    Fog: 'scenes/CityMarketplace_Fog.jpeg',
-    Massacre: 'scenes/CityMarketplace_Massacre.jpeg',
-    DayEmpty: 'scenes/CityMarketplace_Original_Day_Empty.jpeg',
-    Sunset: 'scenes/CityMarketplace_Sunset_Crowd.jpeg',
-    SunsetEmpty: 'scenes/CityMarketplace_Sunset_Empty.jpeg',
-    Night: 'scenes/CityMarketplace_Original_Night.jpeg'
+    Default: "scenes/CityMarketplace_Original_Day_Crowd.jpeg",
+    Rain: "scenes/CityMarketplace_Rain.jpeg",
+    Snow: "scenes/CityMarketplace_Winter.jpeg",
+    Fog: "scenes/CityMarketplace_Fog.jpeg",
+    Massacre: "scenes/CityMarketplace_Massacre.jpeg",
+    DayEmpty: "scenes/CityMarketplace_Original_Day_Empty.jpeg",
+    Sunset: "scenes/CityMarketplace_Sunset_Crowd.jpeg",
+    SunsetEmpty: "scenes/CityMarketplace_Sunset_Empty.jpeg",
+    Night: "scenes/CityMarketplace_Original_Night.jpeg"
   }
 });
 
 // default startup state
-setRegionState('eastern_forest', 3, false, false);
-setRegionState('desert', 3, false, false);
+setRegionState("eastern_forest", 3, false, false);
+setRegionState("desert", 3, false, false);
 
 // apply saved state after regions/scenes exist
 const loadedSave = loadMapState();
 applyLoadedState(loadedSave);
 
+map.on("zoom move resize viewreset zoomend moveend", updateFogClipPath);
+updateFogClipPath();
+
 // ---------- ARCHIVIST CODES ----------
 const archivistCodes = {
-  'EASTERNFORESTGREEN': {
-    message: 'Riverlands survey restored.',
+  EASTERNFORESTGREEN: {
+    message: "Riverlands survey restored.",
     action: {
-      type: 'regionLevel',
-      region: 'eastern_forest',
+      type: "regionLevel",
+      region: "eastern_forest",
       level: 2
     }
   },
-
-  'DESERTTAN': {
-    message: 'Firelands border records recovered.',
+  DESERTTAN: {
+    message: "Firelands border records recovered.",
     action: {
-      type: 'regionLevel',
-      region: 'desert',
+      type: "regionLevel",
+      region: "desert",
       level: 2
     }
   },
-
-  'WITCHHUTRED': {
+  WITCHHUTRED: {
     message: "Hidden Witch's Hut unlocked.",
     action: {
-      type: 'sceneUnlock',
-      sceneId: 'bridge_town'
+      type: "sceneUnlock",
+      sceneId: "bridge_town"
     }
   }
 };
@@ -661,30 +685,26 @@ const archivistCodes = {
 function runArchivistAction(action) {
   if (!action) return false;
 
-  if (action.type === 'regionLevel') {
+  if (action.type === "regionLevel") {
     const current = regionState[action.region];
-
     if (current > action.level) {
       setRegionState(action.region, action.level);
       return true;
     }
-
     return false;
   }
 
-  if (action.type === 'sceneUnlock') {
+  if (action.type === "sceneUnlock") {
     return unlockScene(action.sceneId);
   }
 
-  if (action.type === 'multi') {
+  if (action.type === "multi") {
     let changed = false;
-
-    action.actions.forEach(subAction => {
+    action.actions.forEach((subAction) => {
       if (runArchivistAction(subAction)) {
         changed = true;
       }
     });
-
     return changed;
   }
 
@@ -692,20 +712,20 @@ function runArchivistAction(action) {
 }
 
 // ---------- ARCHIVIST CONSOLE ----------
-const archivistConsole = document.getElementById('archivist-console');
-const archivistToggle = document.getElementById('archivist-toggle');
-const archivistInput = document.getElementById('archivist-code-input');
-const archivistSubmit = document.getElementById('archivist-submit');
-const archivistStatus = document.getElementById('archivist-status');
-const archivistLog = document.getElementById('archivist-log');
+const archivistConsole = document.getElementById("archivist-console");
+const archivistToggle = document.getElementById("archivist-toggle");
+const archivistInput = document.getElementById("archivist-code-input");
+const archivistSubmit = document.getElementById("archivist-submit");
+const archivistStatus = document.getElementById("archivist-status");
+const archivistLog = document.getElementById("archivist-log");
 
-archivistInput.addEventListener('input', function () {
+archivistInput.addEventListener("input", function () {
   this.value = this.value.toUpperCase();
 });
 
-archivistToggle.addEventListener('click', function () {
-  archivistConsole.classList.toggle('collapsed');
-  archivistToggle.textContent = archivistConsole.classList.contains('collapsed') ? '+' : '−';
+archivistToggle.addEventListener("click", function () {
+  archivistConsole.classList.toggle("collapsed");
+  archivistToggle.textContent = archivistConsole.classList.contains("collapsed") ? "+" : "−";
 });
 
 function normalizeCode(code) {
@@ -717,7 +737,7 @@ function setArchivistStatus(message) {
 }
 
 function addArchivistLog(message) {
-  const li = document.createElement('li');
+  const li = document.createElement("li");
   li.textContent = message;
   archivistLog.prepend(li);
 }
@@ -726,7 +746,7 @@ function submitArchivistCode() {
   const code = normalizeCode(archivistInput.value);
 
   if (!code) {
-    setArchivistStatus('Enter a code first.');
+    setArchivistStatus("Enter a code first.");
     return;
   }
 
@@ -748,17 +768,16 @@ function submitArchivistCode() {
     usedCodes.add(code);
     setArchivistStatus(entry.message);
     addArchivistLog(`${code} — ${entry.message}`);
-    archivistInput.value = '';
+    archivistInput.value = "";
     saveMapState();
   } else {
     setArchivistStatus(`"${code}" provided no new information.`);
   }
 }
 
-archivistSubmit.addEventListener('click', submitArchivistCode);
-
-archivistInput.addEventListener('keydown', function (e) {
-  if (e.key === 'Enter') {
+archivistSubmit.addEventListener("click", submitArchivistCode);
+archivistInput.addEventListener("keydown", function (e) {
+  if (e.key === "Enter") {
     submitArchivistCode();
   }
 });
